@@ -23,16 +23,16 @@ port = int(os.environ.get("FASTAPIPORT", 8000))
 
 INSTANCE_CONNECTION_NAME = os.getenv(
     "INSTANCE_CONNECTION_NAME",
-    "cloudcomputing-473814:us-central1:transcription-microservice-cloud-sql",
+    "cloudcomputing-473814:us-central1:transcription-microservice",
 )
 
 DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASS")
+DB_PASSWORD = os.getenv("DB_PASS", "")
 DB_NAME = os.getenv("DB_NAME")
 DB_HOST = os.getenv("DB_HOST") # Used only for local dev (with proxy)
 DB_PORT = int(os.getenv("DB_PORT", "3306"))
 
-if not all([INSTANCE_CONNECTION_NAME, DB_USER, DB_PASSWORD, DB_NAME]):
+if not all([INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME]):
     raise RuntimeError(
         "Missing required DB configuration. Check your .env or Cloud Run env vars."
     )
