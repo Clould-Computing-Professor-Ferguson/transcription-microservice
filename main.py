@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import socket
+import json
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -17,6 +18,8 @@ from models.person import PersonCreate, PersonRead, PersonUpdate
 from models.address import AddressCreate, AddressRead, AddressUpdate
 from models.health import Health
 from models.transcription import TranscriptionCreate, TranscriptionRead, TranscriptionUpdate
+
+from google.cloud import pubsub_v1
 
 load_dotenv()
 port = int(os.environ.get("FASTAPIPORT", 8000))
@@ -37,6 +40,26 @@ if not all([INSTANCE_CONNECTION_NAME, DB_USER, DB_NAME]):
         "Missing required DB configuration. Check your .env or Cloud Run env vars."
     )
 
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(os.getenv("PROJECT_ID", "cloudcomputing-473814"),
+                                   os.getenv("PUBSUB_TOPIC", "transcriptions-events"))
+
+def publish_transcription_event(transcription: TranscriptionRead, event_type: str = "transcription.created"):
+    """
+    Publish a Pub/Sub event when something happens to a transcription.
+    event_type can be 'transcription.created', 'transcription.updated', etc.
+    """
+    payload = {
+        "event_type": event_type,
+        "id": str(transcription.id),
+        "audio_filename": transcription.audio_filename,
+        "status": transcription.status,
+        "created_at": transcription.created_at.isoformat(),
+        "updated_at": transcription.updated_at.isoformat(),
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    future = publisher.publish(topic_path, data=data)
 
 def get_conn():
     """
@@ -160,14 +183,19 @@ async def create_transcription(file: UploadFile = File(...)):
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (str(trans_id), file_name, text_result, status, now, now))
 
-    return TranscriptionRead(
-        id=trans_id,
-        audio_filename=file_name,
-        text=text_result,
-        status=status,
-        created_at=now,
-        updated_at=now,
-    )
+    transcription_obj = TranscriptionRead(
+    id=trans_id,
+    audio_filename=file_name,
+    text=text_result,
+    status=status,
+    created_at=now,
+    updated_at=now,
+)
+
+    # Publish event to Pub/Sub
+    publish_transcription_event(transcription_obj, event_type="transcription.created")
+
+    return transcription_obj
 
 @app.put("/transcriptions/{trans_id}", response_model=TranscriptionRead)
 def update_transcription(trans_id: UUID, payload: TranscriptionUpdate):
