@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 import pymysql
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Form, HTTPException
 from fastapi import Query, Path
 from fastapi import UploadFile, File
 from dotenv import load_dotenv
@@ -110,8 +110,8 @@ persons: Dict[UUID, PersonRead] = {}
 addresses: Dict[UUID, AddressRead] = {}
 
 app = FastAPI(
-    title="Person/Address API",
-    description="Demo FastAPI app using Pydantic v2 models for Person and Address",
+    title="Transcription API",
+    description="Demo FastAPI app using Pydantic v2 models Transcription API",
     version="0.1.0",
 )
 
@@ -165,10 +165,12 @@ def get_transcription(trans_id: UUID):
     )
 
 
-@app.post("/transcriptions", response_model=TranscriptionRead, status_code=201)
-async def create_transcription(file: UploadFile = File(...)):
+@app.post("/transcriptions/{trans_id}", response_model=TranscriptionRead, status_code=201)
+async def create_transcription(
+    trans_id: UUID,
+    file: UploadFile = File(...),
+    ):
     """Upload an audio file + store transcription job in Cloud SQL."""
-    trans_id = uuid.uuid4()
     file_name = file.filename
     status = "completed"
     text_result = f"(Mock transcription of {file_name})"
